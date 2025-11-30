@@ -1,7 +1,6 @@
 <template>
   <div class="h-full flex flex-col bg-gray-50 border-r border-gray-200 overflow-hidden">
 
-    <!-- 顶部标题栏 -->
     <div class="bg-white px-4 py-3 border-b border-gray-200 flex justify-between items-center shadow-sm z-10">
       <div class="flex items-center gap-2">
         <el-icon :size="20" class="text-blue-600">
@@ -10,18 +9,12 @@
         <span class="font-bold text-gray-800 text-lg">训练工作台</span>
       </div>
 
-      <!-- 右侧控制区 -->
       <div class="flex items-center gap-3">
-        <!-- 自动训练开关 -->
         <div class="flex items-center gap-2 mr-2 bg-blue-50 px-2 py-1 rounded border border-blue-100">
           <span class="text-xs text-blue-600 font-bold">无人值守模式</span>
           <el-switch v-model="isAutoMode" size="small" active-text="开" inactive-text="关" @change="toggleAutoMode" />
         </div>
-        <el-button type="warning" plain size="small" :loading="isSyncingModel" @click="syncModel">
-          <el-icon class="mr-1">
-            <Download />
-          </el-icon> 拉取模型
-        </el-button>
+
         <el-button type="primary" plain size="small" :loading="isSyncing" @click="fetchCloudData(true)">
           <el-icon class="mr-1">
             <Download />
@@ -33,10 +26,8 @@
       </div>
     </div>
 
-    <!-- 可滚动区域 -->
     <div class="flex-1 overflow-y-auto p-4 space-y-4">
 
-      <!-- 1. 数据概览 -->
       <el-card shadow="hover" :body-style="{ padding: '15px' }">
         <el-row :gutter="20">
           <el-col :span="12">
@@ -60,7 +51,6 @@
         </el-row>
       </el-card>
 
-      <!-- 2. 数据管理 -->
       <el-card shadow="hover" class="data-card">
         <template #header>
           <div class="flex justify-between items-center">
@@ -73,7 +63,6 @@
           </div>
         </template>
 
-        <!-- 输入与上传 -->
         <div class="flex gap-2 mb-4">
           <el-input v-model="currentLabel" placeholder="输入标签 (如: cat)" clearable @keyup.enter="triggerUpload">
             <template #prepend>标签</template>
@@ -91,7 +80,6 @@
           </el-upload>
         </div>
 
-        <!-- 筛选与管理 -->
         <div v-if="uniqueLabels.length > 0" class="flex justify-between items-center mb-4 bg-gray-50 p-2 rounded">
           <div class="flex items-center gap-2">
             <span class="text-sm text-gray-500">筛选分类:</span>
@@ -104,17 +92,14 @@
           </el-button>
         </div>
 
-        <!-- 图片预览列表 (AutoAnimate) -->
-        <div class="image-grid-container h-48 overflow-y-auto pr-1">
-          <div ref="listRef" class="grid grid-cols-4 gap-2" v-auto-animate>
+        <div class="image-grid-container h-36 overflow-y-auto pr-1">
+          <div ref="listRef" class="grid grid-cols-5 gap-2" v-auto-animate>
             <div v-for="item in paginatedData" :key="item.id"
               class="relative group aspect-square border border-gray-200 rounded overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer">
-              <!-- item.image 是后端 URL -->
               <el-image :src="item.image" class="w-full h-full" fit="cover" loading="lazy" />
               <div class="absolute inset-x-0 bottom-0 bg-black/60 p-1 text-center">
                 <span class="text-xs text-white truncate block">{{ item.label }}</span>
               </div>
-              <!-- 删除遮罩 -->
               <div
                 class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <el-button type="danger" circle size="small" @click="deleteItem(item.id)">
@@ -125,21 +110,18 @@
               </div>
             </div>
 
-            <!-- 空状态 -->
             <div v-if="paginatedData.length === 0" class="col-span-4 py-8 flex justify-center">
               <el-empty description="暂无数据" :image-size="60" />
             </div>
           </div>
         </div>
 
-        <!-- 分页 -->
         <div class="mt-3 flex justify-center">
           <el-pagination v-if="filteredData.length > pageSize" small background layout="prev, pager, next"
             :total="filteredData.length" :page-size="pageSize" v-model:current-page="currentPage" />
         </div>
       </el-card>
 
-      <!-- 3. 模型参数配置 -->
       <el-card shadow="hover" :body-style="{ padding: '10px 20px' }">
         <template #header>
           <div class="flex justify-between items-center cursor-pointer" @click="showConfig = !showConfig">
@@ -156,7 +138,7 @@
               <el-row :gutter="15">
                 <el-col :span="12">
                   <el-form-item label="训练轮数 (Epochs)">
-                    <el-input-number v-model="config.epochs" :min="1" :max="100" class="w-full" />
+                    <el-input-number v-model="config.epochs" :min="1" :max="200" class="w-full" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
@@ -166,13 +148,53 @@
                 </el-col>
               </el-row>
 
-              <el-form-item label="验证集比例">
-                <el-slider v-model="config.validationSplit" :min="0" :max="0.3" :step="0.05" show-stops
-                  :format-tooltip="val => (val * 100) + '%'" />
-              </el-form-item>
+              <el-row :gutter="15">
+                <el-col :span="12">
+                  <el-form-item label="学习率 (Learning Rate)">
+                    <el-select v-model="config.learningRate" placeholder="选择学习率" class="w-full">
+                      <el-option label="0.01 (快速)" :value="0.01" />
+                      <el-option label="0.001 (默认)" :value="0.001" />
+                      <el-option label="0.0001 (微调)" :value="0.0001" />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="验证集比例">
+                    <div class="px-2 w-full">
+                      <el-slider v-model="validationSplitPercent" :min="10" :max="40" :step="5" show-stops
+                        :marks="{ 10: '10%', 20: '20%', 30: '30%', 40: '40%' }" />
+                    </div>
+                  </el-form-item>
+                </el-col>
+              </el-row>
 
-              <el-form-item style="margin-bottom: 0;">
-                <el-checkbox v-model="config.useIncremental" label="启用增量训练模式" border />
+              <el-divider content-position="center">高级参数</el-divider>
+              <el-row :gutter="15">
+                <el-col :span="8">
+                  <el-form-item label="神经元 (Units)">
+                    <el-input-number v-model="config.denseUnits" :step="32" :min="32" :max="512" class="w-full" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="丢弃率 (Dropout)">
+                    <el-input-number v-model="config.dropoutRate" :step="0.1" :min="0" :max="0.9" :precision="1"
+                      class="w-full" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="L2 正则化">
+                    <el-select v-model="config.l2Rate" class="w-full">
+                      <el-option label="0 (关闭)" :value="0" />
+                      <el-option label="0.001 (轻微)" :value="0.001" />
+                      <el-option label="0.01 (适中)" :value="0.01" />
+                      <el-option label="0.05 (强力)" :value="0.05" />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+              </el-row>
+
+              <el-form-item>
+                <el-checkbox v-model="config.useIncremental" label="启用增量训练 (继承旧模型)" border class="w-full" />
               </el-form-item>
             </el-form>
           </div>
@@ -181,41 +203,41 @@
 
     </div>
 
-    <!-- 4. 底部固定控制区 -->
     <div
-      class="bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex-none flex flex-col min-h-[300px]">
-
-      <!-- 启动按钮 -->
+      class="bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex-none flex flex-col min-h-[340px]">
       <div class="flex gap-2 mb-4">
         <el-button type="primary" size="large" class="flex-1 font-bold" :loading="isTraining"
-          :disabled="allDataset.length < 2" @click="startTraining(false)">
-          {{ isTraining ? '模型训练中...' : '🚀 开始训练' }}
-        </el-button>
-
-        <el-button type="success" size="large" class="flex-1 font-bold" :loading="isPublishing" @click="publishModel">
-          发布模型到后端
+          :disabled="allDataset.length < 2" @click="startTraining">
+          {{ isTraining ? '服务器正在训练...' : '🚀 开始远程训练' }}
         </el-button>
       </div>
+      <div class="flex flex-col gap-3 justify-center mb-3">
+        <div class="flex justify-center gap-2 flex-wrap">
+          <el-tag type="warning" effect="dark" size="large" class="font-bold">
+            🏆 Best ValAcc: {{ (trainStatus.bestValAcc * 100).toFixed(1) }}%
+          </el-tag>
 
-      <!-- 特征提取进度 -->
-      <div v-if="featureProcess.total > 0 && !featureProcess.done" class="mb-4">
-        <div class="flex justify-between text-xs text-gray-600 mb-1">
-          <span>特征提取中...</span>
-          <span>{{ featureProcess.processed }}/{{ featureProcess.total }}</span>
+          <el-tag type="success" effect="dark" size="large" class="font-bold">
+            📈 Best Acc: {{ (trainStatus.bestAcc * 100).toFixed(1) }}%
+          </el-tag>
+
+          <el-tag type="info" effect="plain" size="large">
+            📉 Loss: {{ (trainStatus.bestLoss || 0).toFixed(4) }}
+          </el-tag>
+          <el-tag type="info" effect="plain" size="large">
+            📅 Epoch: {{ trainStatus.bestEpoch }}
+          </el-tag>
         </div>
-        <el-progress :percentage="Math.round((featureProcess.processed / featureProcess.total) * 100)"
-          :stroke-width="10" striped striped-flow />
+        <div v-if="trainStatus.epoch > 0" class="flex gap-4 justify-center animate-pulse">
+          <el-tag type="info" effect="plain">Epoch: {{ trainStatus.epoch }} / {{ trainStatus.totalEpochs }}</el-tag>
+          <el-tag type="danger" effect="plain">Loss: {{ trainStatus.loss.toFixed(4) }}</el-tag>
+          <el-tag type="success" effect="plain">Acc: {{ (trainStatus.acc * 100).toFixed(1) }}%</el-tag>
+          <el-tag v-if="trainStatus.val_acc" type="primary" effect="plain">Val: {{ (trainStatus.val_acc *
+            100).toFixed(1)
+          }}%</el-tag>
+        </div>
       </div>
 
-      <!-- 训练指标 -->
-      <div v-if="trainStatus.epoch > 0 || trainStatus.completed" class="flex gap-4 justify-center mb-3">
-        <el-tag type="danger" effect="plain">Loss: {{ trainStatus.loss.toFixed(4) }}</el-tag>
-        <el-tag type="success" effect="plain">Acc: {{ (trainStatus.acc * 100).toFixed(1) }}%</el-tag>
-        <el-tag v-if="trainStatus.val_acc" type="primary" effect="plain">Val: {{ (trainStatus.val_acc * 100).toFixed(1)
-        }}%</el-tag>
-      </div>
-
-      <!-- 图表容器 -->
       <div class="flex-1 relative w-full border border-gray-100 rounded bg-gray-50 p-2 min-h-0">
         <canvas ref="chartCanvas"></canvas>
         <div v-if="!isTraining && !trainStatus.completed"
@@ -234,21 +256,17 @@
 </template>
 
 <script setup>
-import * as tf from '@tensorflow/tfjs';
-import { tfService } from '../utils/tfService';
 import { compressImage } from '../utils/imageUtils';
 import Chart from 'chart.js/auto';
 
-
-const API_BASE = 'http://localhost:3000/api';
+// 环境变量支持
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000/api';
 
 const currentLabel = ref('');
 const allDataset = shallowRef([]);
 const isTraining = ref(false);
 const isProcessingUpload = ref(false);
 const isSyncing = ref(false);
-const isPublishing = ref(false);
-
 
 const filterLabel = ref('');
 const currentPage = ref(1);
@@ -259,23 +277,40 @@ let chartInstance = null;
 const chartCanvas = ref(null);
 const uploadRef = ref(null);
 
-// 自动化相关
 const isAutoMode = ref(false);
 let autoTrainTimer = null;
 
-// 配置
-const savedConfig = JSON.parse(localStorage.getItem('training_config') || '{}');
+
 const config = ref({
-  epochs: 20, batchSize: 16, learningRate: 0.001, validationSplit: 0.1, useIncremental: true,
-  ...savedConfig
+  epochs: 20,
+  batchSize: 16,
+  validationSplit: 0.2,
+  learningRate: 0.001,
+  useIncremental: true,
+  // 🌟 新增默认值
+  denseUnits: 128,
+  dropoutRate: 0.5,
+  l2Rate: 0.01,
+});
+const validationSplitPercent = computed({
+  get: () => Math.round(config.value.validationSplit * 100), // 0.2 -> 20
+  set: (val) => {
+    config.value.validationSplit = val / 100; // 20 -> 0.2
+  }
 });
 watch(config, (newVal) => localStorage.setItem('training_config', JSON.stringify(newVal)), { deep: true });
 
-// 状态
-const trainStatus = ref({ epoch: 0, loss: 0, acc: 0, val_acc: undefined, completed: false });
-const featureProcess = ref({ processed: 0, total: 0, done: false });
 
-// 计算属性
+
+
+
+// 状态：增加 totalEpochs 方便显示进度
+const trainStatus = ref({
+  epoch: 0, totalEpochs: 0, loss: 0, acc: 0, val_acc: undefined,
+  bestValAcc: 0, bestEpoch: 0, bestLoss: 0, bestAcc: 0, // 🌟 增加 bestAcc
+  completed: false
+});
+
 const uniqueLabels = computed(() => {
   const labels = new Set(allDataset.value.map(d => d.label));
   return Array.from(labels).sort();
@@ -295,7 +330,7 @@ const paginatedData = computed(() => {
 });
 watch(filterLabel, () => currentPage.value = 1);
 
-// 🌟 API: 加载数据
+// 加载数据
 const loadData = async () => {
   try {
     const res = await fetch(`${API_BASE}/dataset`);
@@ -308,33 +343,12 @@ const loadData = async () => {
   }
 };
 
-// 🌟 模型同步状态与逻辑 
-const isSyncingModel = ref(false);
-const syncModel = async () => {
-  isSyncingModel.value = true;
-  try {
-    // 调用 tfService 中新加的方法
-    const success = await tfService.loadModelFromBackend();
-    if (success) {
-      ElMessage.success('成功从服务器拉取并更新了本地模型！');
-    } else {
-      ElMessage.warning('服务器上暂时没有已发布的模型。');
-    }
-  } catch (e) {
-    console.error(e);
-    ElMessage.error('同步失败: ' + e.message);
-  } finally {
-    isSyncingModel.value = false;
-  }
-};
-
-// 🌟 API: 同步新数据
+// 同步新数据
 const fetchCloudData = async (isManualClick = true) => {
   if (isSyncing.value || isTraining.value) return;
 
   isSyncing.value = true;
   try {
-    // 1. 查是否有新数据
     const res = await fetch(`${API_BASE}/pending-data`);
     const json = await res.json();
 
@@ -346,14 +360,12 @@ const fetchCloudData = async (isManualClick = true) => {
     const trainedIds = json.data.map(doc => doc._id);
     const count = trainedIds.length;
 
-    // 2. 告诉后端：这些数据我收到了，请转正
     await fetch(`${API_BASE}/mark-trained`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids: trainedIds })
     });
 
-    // 3. 刷新列表
     await loadData();
 
     if (isAutoMode.value) {
@@ -362,7 +374,7 @@ const fetchCloudData = async (isManualClick = true) => {
         message: `检测到 ${count} 条新数据，开始自动训练...`,
         type: 'success'
       });
-      startTraining(true);
+      startTraining();
     } else {
       ElMessage.success(`成功同步 ${count} 条样本！`);
     }
@@ -375,7 +387,30 @@ const fetchCloudData = async (isManualClick = true) => {
   }
 };
 
-// 🌟 API: 上传
+// 在 script setup 中添加一个单独的函数来获取一次状态
+const fetchInitialStatus = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/train/status`);
+    const status = await res.json();
+
+    // 只更新历史最佳数据，不更新 epoch/loss 等实时数据（除非正在训练）
+    trainStatus.value.bestValAcc = status.bestValAcc || 0;
+    trainStatus.value.bestEpoch = status.bestEpoch || 0;
+    trainStatus.value.bestLoss = status.bestLoss || 0;
+    trainStatus.value.bestAcc = status.bestAcc || 0;
+
+    // 如果发现后端正在训练（比如刷新页面后），恢复训练状态
+    if (status.isTraining) {
+      isTraining.value = true;
+      // 这里可以考虑重新启动 pollStatus 轮询，恢复图表
+      // 但为了简单，只同步数据也行
+    }
+  } catch (e) {
+    console.error('获取初始状态失败', e);
+  }
+};
+
+// 上传
 const handleFileChange = async (uploadFile) => {
   if (!currentLabel.value) return;
   isProcessingUpload.value = true;
@@ -394,7 +429,7 @@ const handleFileChange = async (uploadFile) => {
 
     const json = await res.json();
     if (json.success) {
-      allDataset.value = [json.data, ...allDataset.value]; // 本地立即更新
+      allDataset.value = [json.data, ...allDataset.value];
       if (!filterLabel.value) filterLabel.value = currentLabel.value;
       ElMessage.success(`已上传`);
     } else {
@@ -408,7 +443,7 @@ const handleFileChange = async (uploadFile) => {
   }
 };
 
-// 🌟 API: 删除
+// 删除
 const deleteItem = async (id) => {
   try {
     await fetch(`${API_BASE}/dataset/${id}`, { method: 'DELETE' });
@@ -426,28 +461,6 @@ const deleteByLabel = async (label) => {
   } catch { }
 };
 
-// 🌟 API: 发布模型
-const publishModel = async () => {
-  if (!tfService.classifierModel) return ElMessage.warning('请先完成训练');
-  isPublishing.value = true;
-  try {
-    await tfService.classifierModel.save(
-      tf.io.browserHTTPRequest(`${API_BASE}/upload-model`)
-    );
-    await fetch(`${API_BASE}/upload-labels`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ labels: tfService.labels })
-    });
-    ElNotification({ title: '发布成功', message: '模型已更新到后端 API', type: 'success' });
-  } catch (e) {
-    console.error(e);
-    ElMessage.error('发布失败');
-  } finally {
-    isPublishing.value = false;
-  }
-};
-
 // 切换自动模式
 const toggleAutoMode = (val) => {
   if (val) {
@@ -462,17 +475,8 @@ const toggleAutoMode = (val) => {
   }
 };
 
-// 辅助函数
 const checkLabelBeforeUpload = () => { if (!currentLabel.value) return ElMessage.warning('请先输入标签名称'); };
 const triggerUpload = () => { if (!currentLabel.value) return ElMessage.warning('请输入标签'); ElMessage.info('请点击上传按钮'); };
-const clearData = async () => {
-  // 暂时只支持本地清空视图，后端全量清空比较危险，暂不实现
-  try {
-    await ElMessageBox.confirm('这只会清空当前视图，后端数据不会删除。确定？', '提示', { type: 'warning' });
-    allDataset.value = [];
-    ElMessage.success('视图已清空');
-  } catch { }
-};
 
 const initChart = () => {
   if (chartInstance) chartInstance.destroy();
@@ -491,69 +495,91 @@ const initChart = () => {
   });
 };
 
-// 🌟 训练逻辑：只负责发号施令
+// 🌟🌟🌟 新的训练入口 (后端驱动) 🌟🌟🌟
 const startTraining = async () => {
   if (allDataset.value.length < 2) return ElMessage.warning('样本不足');
 
   isTraining.value = true;
-  trainStatus.value = { epoch: 0, loss: 0, acc: 0, completed: false };
-  initChart(); // 重置图表
+
+  // ✅ 修复：直接重置全局状态，而不是重新定义变量
+  trainStatus.value = {
+    epoch: 0, totalEpochs: config.value.epochs, loss: 0, acc: 0,
+    val_acc: undefined, bestValAcc: 0, bestEpoch: 0, bestLoss: 0, bestAcc: 0,
+    completed: false
+  };
+
+  initChart();
 
   try {
-    // 1. 发送开始指令
+    // 1. 发送开始指令 (包含所有参数)
     const res = await fetch(`${API_BASE}/train`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ epochs: config.value.epochs })
+      body: JSON.stringify(config.value)
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.message);
 
     ElMessage.success('服务器已开始训练...');
 
-    // 2. 开启轮询 (每秒查一次状态)
-    const pollInterval = setInterval(async () => {
+    // 2. 开启轮询
+    const pollStatus = async () => {
+      if (!isTraining.value) return;
+
       try {
         const statusRes = await fetch(`${API_BASE}/train/status`);
         const status = await statusRes.json();
 
-        // 更新界面状态
-        if (status.phase === 'training' || status.phase === 'complete') {
+        // 🟢 状态同步
+        if (typeof status.epoch === 'number') {
+          // 更新全局响应式对象
           trainStatus.value = {
             epoch: status.epoch,
+            totalEpochs: status.totalEpochs || config.value.epochs,
             loss: status.loss || 0,
             acc: status.acc || 0,
-            val_acc: status.val_acc
+            val_acc: status.val_acc,
+            bestValAcc: status.bestValAcc || 0,
+            bestEpoch: status.bestEpoch || 0,
+            bestLoss: status.bestLoss || 0,
+            bestAcc: status.bestAcc || 0
           };
 
-          // 更新图表
-          if (chartInstance && status.epoch > chartInstance.data.labels.length) {
-            chartInstance.data.labels.push(status.epoch);
-            chartInstance.data.datasets[0].data.push(status.loss);
-            chartInstance.data.datasets[1].data.push(status.acc);
-            chartInstance.data.datasets[2].data.push(status.val_acc);
-            chartInstance.update();
+          // 更新图表 (使用全量历史数据，解决断层问题)
+          if (chartInstance && status.history && status.history.length > 0) {
+            chartInstance.data.labels = status.history.map(h => h.epoch);
+            chartInstance.data.datasets[0].data = status.history.map(h => h.loss);
+            chartInstance.data.datasets[1].data = status.history.map(h => h.acc);
+            chartInstance.data.datasets[2].data = status.history.map(h => h.val_acc);
+            chartInstance.update('none');
           }
         }
 
-        // 检查是否结束
+        // 🔴 错误处理
+        if (status.phase === 'error') {
+          throw new Error(status.error || '后端训练异常');
+        }
+
+        // 🔵 完成处理
         if (status.phase === 'complete') {
-          clearInterval(pollInterval);
           isTraining.value = false;
           trainStatus.value.completed = true;
-          ElMessage.success('远程训练完成！');
-          // 训练完后，可以顺便拉取一下最新模型到本地（方便前端推理，如果还需要前端推理的话）
-          // syncModel(); 
-        } else if (status.phase === 'error') {
-          throw new Error(status.error || '训练异常中止');
+          // 最后一次刷新图表
+          if (chartInstance) chartInstance.update();
+          ElMessage.success(`训练完成！(共 ${status.epoch} 轮)`);
+        } else {
+          setTimeout(pollStatus, 1000);
         }
 
       } catch (err) {
-        clearInterval(pollInterval);
         isTraining.value = false;
-        ElMessage.error('获取训练状态失败: ' + err.message);
+        if (err.name !== 'AbortError') {
+          ElMessage.error('获取状态失败: ' + err.message);
+        }
       }
-    }, 1000); // 1秒轮询一次
+    };
+
+    setTimeout(pollStatus, 1000);
 
   } catch (err) {
     isTraining.value = false;
@@ -564,10 +590,12 @@ const startTraining = async () => {
 onUnmounted(() => {
   if (chartInstance) chartInstance.destroy();
   if (autoTrainTimer) clearInterval(autoTrainTimer);
+  isTraining.value = false;
 });
 
 onMounted(async () => {
   await loadData();
+  await fetchInitialStatus();
   nextTick(() => initChart());
 });
 </script>

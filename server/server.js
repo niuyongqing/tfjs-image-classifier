@@ -95,12 +95,10 @@ initAI();
 // 🌟 1. 触发训练 API
 app.post('/api/train', async (req, res) => {
   try {
-    const { epochs = 20 } = req.body;
-    // 异步启动，不等待结束直接返回
-    trainService.startTraining({ epochs }).catch(err => console.error("后台训练出错:", err));
+    trainService.startTraining(req.body).catch(err => console.error("后台训练出错:", err));
+
     res.json({ success: true, message: '训练指令已发送' });
   } catch (error) {
-    // 如果已经在训练中，会在这里报错
     res.status(400).json({ success: false, message: error.message });
   }
 });
