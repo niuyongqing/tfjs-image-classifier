@@ -1,29 +1,31 @@
 <template>
   <div class="h-full flex flex-col bg-gray-50 border-r border-gray-200 overflow-hidden">
-    
+
     <!-- 顶部标题栏 -->
     <div class="bg-white px-4 py-3 border-b border-gray-200 flex justify-between items-center shadow-sm z-10">
       <div class="flex items-center gap-2">
-        <el-icon :size="20" class="text-blue-600"><Tools /></el-icon>
+        <el-icon :size="20" class="text-blue-600">
+          <Tools />
+        </el-icon>
         <span class="font-bold text-gray-800 text-lg">训练工作台</span>
       </div>
-      
+
       <!-- 右侧控制区 -->
       <div class="flex items-center gap-3">
         <!-- 自动训练开关 -->
         <div class="flex items-center gap-2 mr-2 bg-blue-50 px-2 py-1 rounded border border-blue-100">
           <span class="text-xs text-blue-600 font-bold">无人值守模式</span>
-          <el-switch 
-            v-model="isAutoMode" 
-            size="small" 
-            active-text="开" 
-            inactive-text="关"
-            @change="toggleAutoMode"
-          />
+          <el-switch v-model="isAutoMode" size="small" active-text="开" inactive-text="关" @change="toggleAutoMode" />
         </div>
-
+        <el-button type="warning" plain size="small" :loading="isSyncingModel" @click="syncModel">
+          <el-icon class="mr-1">
+            <Download />
+          </el-icon> 拉取模型
+        </el-button>
         <el-button type="primary" plain size="small" :loading="isSyncing" @click="fetchCloudData(true)">
-          <el-icon class="mr-1"><Download /></el-icon> 同步新数据
+          <el-icon class="mr-1">
+            <Download />
+          </el-icon> 同步新数据
         </el-button>
         <el-tag :type="isTraining ? 'warning' : 'success'" effect="dark" round>
           {{ isTraining ? '正在训练...' : '系统就绪' }}
@@ -33,21 +35,25 @@
 
     <!-- 可滚动区域 -->
     <div class="flex-1 overflow-y-auto p-4 space-y-4">
-      
+
       <!-- 1. 数据概览 -->
       <el-card shadow="hover" :body-style="{ padding: '15px' }">
         <el-row :gutter="20">
           <el-col :span="12">
             <el-statistic title="总样本数" :value="allDataset.length">
               <template #suffix>
-                <el-icon style="vertical-align: -0.125em"><Picture /></el-icon>
+                <el-icon style="vertical-align: -0.125em">
+                  <Picture />
+                </el-icon>
               </template>
             </el-statistic>
           </el-col>
           <el-col :span="12">
             <el-statistic title="分类数量" :value="uniqueLabels.length">
               <template #suffix>
-                <el-icon style="vertical-align: -0.125em"><PriceTag /></el-icon>
+                <el-icon style="vertical-align: -0.125em">
+                  <PriceTag />
+                </el-icon>
               </template>
             </el-statistic>
           </el-col>
@@ -60,34 +66,26 @@
           <div class="flex justify-between items-center">
             <span class="font-bold">数据录入</span>
             <el-button v-if="allDataset.length > 0" type="primary" link @click="loadData">
-              <el-icon><Refresh /></el-icon> 刷新列表
+              <el-icon>
+                <Refresh />
+              </el-icon> 刷新列表
             </el-button>
           </div>
         </template>
 
         <!-- 输入与上传 -->
         <div class="flex gap-2 mb-4">
-          <el-input 
-            v-model="currentLabel" 
-            placeholder="输入标签 (如: cat)" 
-            clearable
-            @keyup.enter="triggerUpload"
-          >
+          <el-input v-model="currentLabel" placeholder="输入标签 (如: cat)" clearable @keyup.enter="triggerUpload">
             <template #prepend>标签</template>
           </el-input>
-          
-          <el-upload
-            ref="uploadRef"
-            action="#"
-            :auto-upload="false"
-            :show-file-list="false"
-            :on-change="handleFileChange"
-            accept="image/*"
-            multiple
-          >
+
+          <el-upload ref="uploadRef" action="#" :auto-upload="false" :show-file-list="false"
+            :on-change="handleFileChange" accept="image/*" multiple>
             <template #trigger>
               <el-button type="primary" :loading="isProcessingUpload" @click="checkLabelBeforeUpload">
-                <el-icon class="el-icon--left"><Upload /></el-icon>上传
+                <el-icon class="el-icon--left">
+                  <Upload />
+                </el-icon>上传
               </el-button>
             </template>
           </el-upload>
@@ -98,21 +96,10 @@
           <div class="flex items-center gap-2">
             <span class="text-sm text-gray-500">筛选分类:</span>
             <el-select v-model="filterLabel" placeholder="全部显示" size="small" style="width: 140px" clearable>
-              <el-option
-                v-for="lbl in uniqueLabels"
-                :key="lbl"
-                :label="`${lbl} (${labelCounts[lbl]})`"
-                :value="lbl"
-              />
+              <el-option v-for="lbl in uniqueLabels" :key="lbl" :label="`${lbl} (${labelCounts[lbl]})`" :value="lbl" />
             </el-select>
           </div>
-          <el-button 
-            v-if="filterLabel" 
-            type="danger" 
-            size="small" 
-            plain 
-            @click="deleteByLabel(filterLabel)"
-          >
+          <el-button v-if="filterLabel" type="danger" size="small" plain @click="deleteByLabel(filterLabel)">
             删除 {{ filterLabel }}
           </el-button>
         </div>
@@ -120,47 +107,35 @@
         <!-- 图片预览列表 (AutoAnimate) -->
         <div class="image-grid-container h-48 overflow-y-auto pr-1">
           <div ref="listRef" class="grid grid-cols-4 gap-2" v-auto-animate>
-            <div 
-              v-for="item in paginatedData" 
-              :key="item.id" 
-              class="relative group aspect-square border border-gray-200 rounded overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer"
-            >
+            <div v-for="item in paginatedData" :key="item.id"
+              class="relative group aspect-square border border-gray-200 rounded overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer">
               <!-- item.image 是后端 URL -->
-              <el-image 
-                :src="item.image" 
-                class="w-full h-full" 
-                fit="cover" 
-                loading="lazy"
-              />
+              <el-image :src="item.image" class="w-full h-full" fit="cover" loading="lazy" />
               <div class="absolute inset-x-0 bottom-0 bg-black/60 p-1 text-center">
                 <span class="text-xs text-white truncate block">{{ item.label }}</span>
               </div>
               <!-- 删除遮罩 -->
-              <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <div
+                class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <el-button type="danger" circle size="small" @click="deleteItem(item.id)">
-                  <el-icon><Delete /></el-icon>
+                  <el-icon>
+                    <Delete />
+                  </el-icon>
                 </el-button>
               </div>
             </div>
-            
+
             <!-- 空状态 -->
             <div v-if="paginatedData.length === 0" class="col-span-4 py-8 flex justify-center">
               <el-empty description="暂无数据" :image-size="60" />
             </div>
           </div>
         </div>
-        
+
         <!-- 分页 -->
         <div class="mt-3 flex justify-center">
-           <el-pagination
-            v-if="filteredData.length > pageSize"
-            small
-            background
-            layout="prev, pager, next"
-            :total="filteredData.length"
-            :page-size="pageSize"
-            v-model:current-page="currentPage"
-          />
+          <el-pagination v-if="filteredData.length > pageSize" small background layout="prev, pager, next"
+            :total="filteredData.length" :page-size="pageSize" v-model:current-page="currentPage" />
         </div>
       </el-card>
 
@@ -169,10 +144,12 @@
         <template #header>
           <div class="flex justify-between items-center cursor-pointer" @click="showConfig = !showConfig">
             <span class="font-bold">训练参数</span>
-            <el-icon :class="{'rotate-180': showConfig}" class="transition-transform duration-300"><ArrowDown /></el-icon>
+            <el-icon :class="{ 'rotate-180': showConfig }" class="transition-transform duration-300">
+              <ArrowDown />
+            </el-icon>
           </div>
         </template>
-        
+
         <el-collapse-transition>
           <div v-show="showConfig">
             <el-form label-position="top" size="small">
@@ -188,13 +165,14 @@
                   </el-form-item>
                 </el-col>
               </el-row>
-              
+
               <el-form-item label="验证集比例">
-                <el-slider v-model="config.validationSplit" :min="0" :max="0.3" :step="0.05" show-stops :format-tooltip="val => (val * 100) + '%'" />
+                <el-slider v-model="config.validationSplit" :min="0" :max="0.3" :step="0.05" show-stops
+                  :format-tooltip="val => (val * 100) + '%'" />
               </el-form-item>
 
               <el-form-item style="margin-bottom: 0;">
-                 <el-checkbox v-model="config.useIncremental" label="启用增量训练模式" border />
+                <el-checkbox v-model="config.useIncremental" label="启用增量训练模式" border />
               </el-form-item>
             </el-form>
           </div>
@@ -204,28 +182,17 @@
     </div>
 
     <!-- 4. 底部固定控制区 -->
-    <div class="bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex-none flex flex-col min-h-[300px]">
-      
+    <div
+      class="bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex-none flex flex-col min-h-[300px]">
+
       <!-- 启动按钮 -->
       <div class="flex gap-2 mb-4">
-        <el-button 
-          type="primary" 
-          size="large" 
-          class="flex-1 font-bold" 
-          :loading="isTraining"
-          :disabled="allDataset.length < 2"
-          @click="startTraining(false)"
-        >
+        <el-button type="primary" size="large" class="flex-1 font-bold" :loading="isTraining"
+          :disabled="allDataset.length < 2" @click="startTraining(false)">
           {{ isTraining ? '模型训练中...' : '🚀 开始训练' }}
         </el-button>
-        
-        <el-button 
-          type="success" 
-          size="large" 
-          class="flex-1 font-bold" 
-          :loading="isPublishing"
-          @click="publishModel"
-        >
+
+        <el-button type="success" size="large" class="flex-1 font-bold" :loading="isPublishing" @click="publishModel">
           发布模型到后端
         </el-button>
       </div>
@@ -236,30 +203,30 @@
           <span>特征提取中...</span>
           <span>{{ featureProcess.processed }}/{{ featureProcess.total }}</span>
         </div>
-        <el-progress 
-          :percentage="Math.round((featureProcess.processed / featureProcess.total) * 100)" 
-          :stroke-width="10" 
-          striped 
-          striped-flow 
-        />
+        <el-progress :percentage="Math.round((featureProcess.processed / featureProcess.total) * 100)"
+          :stroke-width="10" striped striped-flow />
       </div>
 
       <!-- 训练指标 -->
       <div v-if="trainStatus.epoch > 0 || trainStatus.completed" class="flex gap-4 justify-center mb-3">
-         <el-tag type="danger" effect="plain">Loss: {{ trainStatus.loss.toFixed(4) }}</el-tag>
-         <el-tag type="success" effect="plain">Acc: {{ (trainStatus.acc * 100).toFixed(1) }}%</el-tag>
-         <el-tag v-if="trainStatus.val_acc" type="primary" effect="plain">Val: {{ (trainStatus.val_acc * 100).toFixed(1) }}%</el-tag>
+        <el-tag type="danger" effect="plain">Loss: {{ trainStatus.loss.toFixed(4) }}</el-tag>
+        <el-tag type="success" effect="plain">Acc: {{ (trainStatus.acc * 100).toFixed(1) }}%</el-tag>
+        <el-tag v-if="trainStatus.val_acc" type="primary" effect="plain">Val: {{ (trainStatus.val_acc * 100).toFixed(1)
+        }}%</el-tag>
       </div>
 
       <!-- 图表容器 -->
       <div class="flex-1 relative w-full border border-gray-100 rounded bg-gray-50 p-2 min-h-0">
-         <canvas ref="chartCanvas"></canvas>
-         <div v-if="!isTraining && !trainStatus.completed" class="absolute inset-0 flex items-center justify-center text-gray-300 pointer-events-none">
-           <div class="text-center">
-             <el-icon :size="40"><DataLine /></el-icon>
-             <p class="text-xs mt-1">训练图表区域</p>
-           </div>
-         </div>
+        <canvas ref="chartCanvas"></canvas>
+        <div v-if="!isTraining && !trainStatus.completed"
+          class="absolute inset-0 flex items-center justify-center text-gray-300 pointer-events-none">
+          <div class="text-center">
+            <el-icon :size="40">
+              <DataLine />
+            </el-icon>
+            <p class="text-xs mt-1">训练图表区域</p>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -267,25 +234,26 @@
 </template>
 
 <script setup>
-// 🌟 1. 彻底移除 db (Dexie) 引用
+import * as tf from '@tensorflow/tfjs';
 import { tfService } from '../utils/tfService';
-import { compressImage } from '../utils/imageUtils'; 
+import { compressImage } from '../utils/imageUtils';
 import Chart from 'chart.js/auto';
-// 自动导入插件会自动处理 Vue 和 Element Plus 的 API
+
 
 const API_BASE = 'http://localhost:3000/api';
 
 const currentLabel = ref('');
-const allDataset = shallowRef([]); 
+const allDataset = shallowRef([]);
 const isTraining = ref(false);
 const isProcessingUpload = ref(false);
 const isSyncing = ref(false);
 const isPublishing = ref(false);
 
+
 const filterLabel = ref('');
 const currentPage = ref(1);
-const pageSize = 12; 
-const showConfig = ref(true); 
+const pageSize = 12;
+const showConfig = ref(true);
 
 let chartInstance = null;
 const chartCanvas = ref(null);
@@ -298,7 +266,7 @@ let autoTrainTimer = null;
 // 配置
 const savedConfig = JSON.parse(localStorage.getItem('training_config') || '{}');
 const config = ref({
-  epochs: 20, batchSize: 16, learningRate: 0.001, validationSplit: 0.1, useIncremental: false,
+  epochs: 20, batchSize: 16, learningRate: 0.001, validationSplit: 0.1, useIncremental: true,
   ...savedConfig
 });
 watch(config, (newVal) => localStorage.setItem('training_config', JSON.stringify(newVal)), { deep: true });
@@ -333,23 +301,43 @@ const loadData = async () => {
     const res = await fetch(`${API_BASE}/dataset`);
     const json = await res.json();
     if (json.success) {
-      allDataset.value = json.data; 
+      allDataset.value = json.data;
     }
   } catch (e) {
     ElMessage.error("无法连接到后端服务器");
   }
 };
 
+// 🌟 模型同步状态与逻辑 
+const isSyncingModel = ref(false);
+const syncModel = async () => {
+  isSyncingModel.value = true;
+  try {
+    // 调用 tfService 中新加的方法
+    const success = await tfService.loadModelFromBackend();
+    if (success) {
+      ElMessage.success('成功从服务器拉取并更新了本地模型！');
+    } else {
+      ElMessage.warning('服务器上暂时没有已发布的模型。');
+    }
+  } catch (e) {
+    console.error(e);
+    ElMessage.error('同步失败: ' + e.message);
+  } finally {
+    isSyncingModel.value = false;
+  }
+};
+
 // 🌟 API: 同步新数据
 const fetchCloudData = async (isManualClick = true) => {
-  if (isSyncing.value || isTraining.value) return; 
+  if (isSyncing.value || isTraining.value) return;
 
   isSyncing.value = true;
   try {
     // 1. 查是否有新数据
     const res = await fetch(`${API_BASE}/pending-data`);
     const json = await res.json();
-    
+
     if (!json.success || json.data.length === 0) {
       if (isManualClick) ElMessage.info('暂无待训练数据');
       return;
@@ -364,10 +352,10 @@ const fetchCloudData = async (isManualClick = true) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids: trainedIds })
     });
-    
+
     // 3. 刷新列表
     await loadData();
-    
+
     if (isAutoMode.value) {
       ElNotification({
         title: '自动训练启动',
@@ -389,12 +377,12 @@ const fetchCloudData = async (isManualClick = true) => {
 
 // 🌟 API: 上传
 const handleFileChange = async (uploadFile) => {
-  if (!currentLabel.value) return; 
+  if (!currentLabel.value) return;
   isProcessingUpload.value = true;
   try {
     const file = uploadFile.raw;
     const compressedBase64 = await compressImage(file);
-    
+
     const res = await fetch(`${API_BASE}/dataset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -403,7 +391,7 @@ const handleFileChange = async (uploadFile) => {
         image: compressedBase64
       })
     });
-    
+
     const json = await res.json();
     if (json.success) {
       allDataset.value = [json.data, ...allDataset.value]; // 本地立即更新
@@ -435,7 +423,7 @@ const deleteByLabel = async (label) => {
     await loadData();
     filterLabel.value = '';
     ElMessage.success('删除成功');
-  } catch {}
+  } catch { }
 };
 
 // 🌟 API: 发布模型
@@ -453,6 +441,7 @@ const publishModel = async () => {
     });
     ElNotification({ title: '发布成功', message: '模型已更新到后端 API', type: 'success' });
   } catch (e) {
+    console.error(e);
     ElMessage.error('发布失败');
   } finally {
     isPublishing.value = false;
@@ -482,7 +471,7 @@ const clearData = async () => {
     await ElMessageBox.confirm('这只会清空当前视图，后端数据不会删除。确定？', '提示', { type: 'warning' });
     allDataset.value = [];
     ElMessage.success('视图已清空');
-  } catch {}
+  } catch { }
 };
 
 const initChart = () => {
@@ -505,7 +494,7 @@ const initChart = () => {
 // 🌟 训练入口
 const startTraining = async (autoPublish = false) => {
   if (allDataset.value.length < 2) return ElMessage.warning('样本不足');
-  
+
   isTraining.value = true;
   trainStatus.value.completed = false;
   featureProcess.value = { processed: 0, total: 0, done: false };
@@ -515,7 +504,7 @@ const startTraining = async (autoPublish = false) => {
     // 🌟 关键：直接将内存中的 allDataset 传给 tfService
     // tfService.train 会处理 URL 图片
     await tfService.train(
-      allDataset.value, 
+      allDataset.value,
       config.value,
       {
         onEpochEnd: (epoch, logs) => {
@@ -534,7 +523,7 @@ const startTraining = async (autoPublish = false) => {
       }
     );
     trainStatus.value.completed = true;
-    
+
     if (autoPublish) await publishModel();
     else ElMessage.success('模型训练完成！');
 
@@ -557,6 +546,12 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.image-grid-container::-webkit-scrollbar { width: 6px; }
-.image-grid-container::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 4px; }
+.image-grid-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.image-grid-container::-webkit-scrollbar-thumb {
+  background: #dcdfe6;
+  border-radius: 4px;
+}
 </style>

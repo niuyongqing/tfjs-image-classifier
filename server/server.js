@@ -15,6 +15,8 @@ const db = Datastore.create({ filename: path.join(__dirname, 'data.db'), autoloa
 const UPLOAD_DIR = path.join(__dirname, 'public', 'uploads');
 const MODEL_DIR = path.join(__dirname, 'public', 'current-model'); // 模型目录
 
+
+
 // 确保目录存在
 [UPLOAD_DIR, MODEL_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -28,6 +30,9 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 // 🌟 开放静态资源，让前端能访问图片
 app.use('/uploads', express.static(UPLOAD_DIR));
 
+// 🌟 【新增】开放模型目录，这样前端才能通过 URL 下载 model.json
+app.use('/model', express.static(MODEL_DIR));
+
 // =================================================================
 // 🌟 1. 获取数据集 (替代 IndexedDB.toArray)
 // =================================================================
@@ -36,8 +41,8 @@ app.get('/api/dataset', async (req, res) => {
     const docs = await db.find({}).sort({ createdAt: -1 });
     const fullDocs = docs.map(doc => ({
       ...doc,
-      id: doc._id, 
-      image: `http://localhost:3000${doc.imageUrl}` 
+      id: doc._id,
+      image: `http://localhost:3000${doc.imageUrl}`
     }));
     res.json({ success: true, data: fullDocs });
   } catch (error) {
@@ -51,7 +56,7 @@ app.get('/api/dataset', async (req, res) => {
 app.post('/api/dataset', async (req, res) => {
   try {
     const { image, label } = req.body;
-    
+
     // 保存图片文件
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
     const fileName = `${uuidv4()}.jpg`;
@@ -65,12 +70,12 @@ app.post('/api/dataset', async (req, res) => {
       createdAt: new Date(),
       status: 'active' // 标记为有效样本
     };
-    
+
     const newDoc = await db.insert(doc);
-    
-    res.json({ 
-      success: true, 
-      data: { ...newDoc, id: newDoc._id, image: `http://localhost:3000${newDoc.imageUrl}` } 
+
+    res.json({
+      success: true,
+      data: { ...newDoc, id: newDoc._id, image: `http://localhost:3000${newDoc.imageUrl}` }
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -91,7 +96,7 @@ app.delete('/api/dataset/:id', async (req, res) => {
         // path.join(__dirname, 'public', doc.imageUrl) -> server/public/uploads/xxx.jpg
         const filePath = path.join(__dirname, 'public', doc.imageUrl);
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      } catch(e) { console.error("文件删除失败", e); }
+      } catch (e) { console.error("文件删除失败", e); }
     }
     await db.remove({ _id: id }, {});
     res.json({ success: true });
@@ -168,16 +173,16 @@ app.post('/api/upload-sample', async (req, res) => {
 // =================================================================
 // 🌟 8. 接收前端发布的模型
 // =================================================================
-const modelUpload = multer({ 
+const modelUpload = multer({
   storage: multer.diskStorage({
     destination: MODEL_DIR,
     filename: (req, f, cb) => cb(null, f.originalname)
-  }) 
+  })
 });
-app.post('/api/upload-model', modelUpload.any(), (req, res) => res.json({success:true}));
+app.post('/api/upload-model', modelUpload.any(), (req, res) => res.json({ success: true }));
 app.post('/api/upload-labels', async (req, res) => {
-    fs.writeFileSync(path.join(MODEL_DIR, 'labels.json'), JSON.stringify(req.body.labels));
-    res.json({success:true});
+  fs.writeFileSync(path.join(MODEL_DIR, 'labels.json'), JSON.stringify(req.body.labels));
+  res.json({ success: true });
 });
 
 const PORT = 3000;

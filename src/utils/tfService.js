@@ -3,7 +3,8 @@ import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-backend-webgl';
 import * as mobilenet from '@tensorflow-models/mobilenet';
 import { loadImageFromBase64 } from './imageUtils';
-
+const SERVER_MODEL_URL = 'http://localhost:3000/model/model.json'; // 后端模型地址
+const SERVER_LABELS_URL = 'http://localhost:3000/model/labels.json'; // 后端标签地址
 /**
  * TFService: 核心 AI 服务类
  * 负责管理 TensorFlow.js 的生命周期。
@@ -49,6 +50,38 @@ class TFService {
       [array[i], array[j]] = [array[j], array[i]];
     }
     return array;
+  }
+
+  /**
+   * 🆕 新增：尝试从服务器加载模型并同步到本地
+   * 这个方法可以被“predict”调用，也可以被“手动更新按钮”调用
+   */
+  async loadModelFromBackend() {
+    try {
+      console.log('尝试从服务器加载模型...');
+
+      // 1. 加载模型结构和权重
+      const model = await tf.loadLayersModel(SERVER_MODEL_URL);
+
+      // 2. 加载标签 (JSON)
+      const res = await fetch(SERVER_LABELS_URL);
+      if (!res.ok) throw new Error('无法获取标签文件');
+      const labels = await res.json();
+
+      // 3. 💾 保存到本地 IndexedDB，下次直接用，不用再请求网络
+      await model.save('indexeddb://my-custom-model');
+      localStorage.setItem('model_labels', JSON.stringify(labels));
+
+      // 4. 更新内存中的状态
+      this.classifierModel = model;
+      this.labels = labels;
+
+      console.log('✅ 模型已从服务器同步并缓存到本地！');
+      return true;
+    } catch (e) {
+      console.warn('服务器也没有可用的模型:', e.message);
+      return false;
+    }
   }
 
   /**
@@ -197,24 +230,38 @@ class TFService {
         const batchFeatures = tf.tidy(() => {
           const tensors = batchImages.map(img => {
             let t = tf.browser.fromPixels(img).toFloat();
-            // 简单数据增强：随机翻转
+
+            // 🌟 [新增] 增强策略 1: 随机旋转 (-20度 到 20度)
+            // 手机拍摄的图片通常有轻微的角度倾斜，这个非常重要
+            if (Math.random() > 0.4) {
+              // tf.image.rotateWithOffset 需要 4D 张量
+              const angle = (Math.random() - 0.5) * 0.4; // 约 +/- 20度弧度
+              const expanded = t.expandDims(0);
+              const rotated = tf.image.rotateWithOffset(expanded, angle, 0); // 0 = 黑色填充
+              t = rotated.squeeze(0);
+            }
+
+            // 🌟 简单数据增强：随机左右翻转
             if (Math.random() > 0.5) {
-              // expandDims(0): [H, W, C] -> [1, H, W, C]
               const batched = t.expandDims(0);
               const flipped = tf.image.flipLeftRight(batched);
-
-              // 释放原有的 t 和临时的 batched，保留 flipped
-              // 注意：如果是 t 本身也是临时生成的，最好让它在 tidy 内部自动处理
-              // 但因为这里 t 变量被复用，我们可以这样写：
-
-              // squeeze(0): [1, H, W, C] -> [H, W, C]
-              const result = flipped.squeeze(0);
-
-              // 清理中间变量 (tf.tidy 会自动做，但为了逻辑严谨)
-              // 如果你在外面套了 tf.tidy，这些 dispose 其实可以省略
-              // 但为了安全起见，最简单的写法是用 tidy 包裹这段小逻辑
-              t = result;
+              t = flipped.squeeze(0);
             }
+
+            // 🌟 [新增] 增强策略 2: 随机调整亮度
+            // 模拟云端图片不同的光照条件
+            if (Math.random() > 0.4) {
+              // 随机增加或减少像素值 (亮度)
+              const delta = (Math.random() - 0.5) * 50;
+              t = t.add(delta);
+              // 确保像素值不越界 (0-255)
+              t = t.clipByValue(0, 255);
+            }
+
+            // 归一化 (MobileNet 期望输入是 -1 到 1 之间，或者 0-1)
+            // 这一步最好显式加上，虽然 MobileNet 内部可能会处理，但显式处理更稳
+            // t = t.div(127.5).sub(1);
+
             return this.mobilenetModel.infer(t, true);
           });
           return tf.concat(tensors);
@@ -257,7 +304,7 @@ class TFService {
         layers: [
           tf.layers.dense({
             inputShape: [featureSize],
-            units: 128,
+            units: 32,
             activation: 'relu',
             kernelInitializer: 'varianceScaling'
           }),
@@ -303,16 +350,38 @@ class TFService {
     }
   }
 
+  /**
+   * 预测图片分类
+   * @param {HTMLImageElement} imgElement - 图片元素
+   * @returns {Promise<Array<{label: string, score: number}>>} 分类结果
+   */
   async predict(imgElement) {
     if (!this.classifierModel) {
       try {
+        // 1.1 优先尝试：本地 IndexedDB
+        console.log('尝试加载本地缓存模型...');
         this.classifierModel = await tf.loadLayersModel('indexeddb://my-custom-model');
         this.labels = JSON.parse(localStorage.getItem('model_labels') || '[]');
-      } catch (e) { throw new Error("模型尚未训练，请先完成训练。"); }
+        console.log('本地缓存模型加载成功');
+      } catch (e) {
+        // 1.2 兜底策略：本地没有，去服务器拉！(这是你想要的功能)
+        console.log('本地无模型，切换到服务器下载模式...');
+        const success = await this.loadModelFromBackend();
+
+        if (!success) {
+          // 1.3 还没成功？那就是真没有了
+          throw new Error("模型尚未训练，且服务器暂无可用模型。请先进行训练。");
+        }
+      }
     }
     if (!this.mobilenetModel) await this.loadBaseModel();
     if (tf.getBackend() !== 'webgl' && tf.getBackend() !== 'cpu') await this.initBackend();
-
+    /**
+     * 预测图片分类
+     * @param {HTMLImageElement} imgElement - 图片元素
+     * @returns {Promise<Array<{label: string, score: number}>>} 分类结果
+     */
+    //tidy 确保在预测完成后及时释放内存
     return tf.tidy(() => {
       const imgTensor = tf.browser.fromPixels(imgElement).toFloat();
       const activation = this.mobilenetModel.infer(imgTensor, true);
