@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Element Plus 主题定制 
+  您可以修改 --el-color-primary 为任何您喜欢的颜色
+*/
+:root {
+  /* 基础主色 (Indigo-600) */
+  --el-color-primary: #4f46e5;
+  
+  /* Element Plus 需要手动定义主色的浅色/深色变体 
+     如果不定义这些，Hover 和 Active 状态的颜色会不正确
+     可以使用在线工具生成这些色值: https://element-plus.org/zh-CN/component/color.html
+  */
+  --el-color-primary-light-3: #7c76ec;
+  --el-color-primary-light-5: #a29df2;
+  --el-color-primary-light-7: #c9c6f8;
+  --el-color-primary-light-8: #dcdafd;
+  --el-color-primary-light-9: #efeffe;
+  --el-color-primary-dark-2: #3731a0;
+
+  /* 成功色 (Success) - 保持默认或微调 */
+  --el-color-success: #67c23a;
+  /* 警告色 (Warning) */
+  --el-color-warning: #e6a23c;
+  /* 危险色 (Danger) */
+  --el-color-danger: #f56c6c;
+  /* 信息色 (Info) */
+  --el-color-info: #909399;
+}
+
+/* 全局字体优化 
+*/
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 暗黑模式配置 (Dark Mode)
+  如果 html 标签上有 class="dark"，这些变量会生效
+*/
+html.dark {
+  /* 定义暗黑模式下的主色，通常需要稍微亮一点以保证对比度 */
+  --el-color-primary: #6366f1;
+  --el-color-primary-light-3: #818cf8;
+  --el-color-primary-light-7: #c7d2fe;
+  
+  /* 覆盖背景色为深色 */
+  --el-bg-color: #1a1a1a;
+  --el-bg-color-overlay: #242424;
+  --el-text-color-primary: #ffffff;
+  --el-border-color-light: #4c4d4f;
+}
