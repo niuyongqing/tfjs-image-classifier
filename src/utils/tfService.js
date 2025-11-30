@@ -53,7 +53,7 @@ class TFService {
   }
 
   /**
-   * 🆕 新增：尝试从服务器加载模型并同步到本地
+   * 尝试从服务器加载模型并同步到本地
    * 这个方法可以被“predict”调用，也可以被“手动更新按钮”调用
    */
   async loadModelFromBackend() {

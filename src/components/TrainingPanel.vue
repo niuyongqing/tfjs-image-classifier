@@ -491,46 +491,73 @@ const initChart = () => {
   });
 };
 
-// 🌟 训练入口
-const startTraining = async (autoPublish = false) => {
+// 🌟 训练逻辑：只负责发号施令
+const startTraining = async () => {
   if (allDataset.value.length < 2) return ElMessage.warning('样本不足');
 
   isTraining.value = true;
-  trainStatus.value.completed = false;
-  featureProcess.value = { processed: 0, total: 0, done: false };
-  initChart();
+  trainStatus.value = { epoch: 0, loss: 0, acc: 0, completed: false };
+  initChart(); // 重置图表
 
   try {
-    // 🌟 关键：直接将内存中的 allDataset 传给 tfService
-    // tfService.train 会处理 URL 图片
-    await tfService.train(
-      allDataset.value,
-      config.value,
-      {
-        onEpochEnd: (epoch, logs) => {
-          trainStatus.value = { epoch: epoch + 1, loss: logs.loss, acc: logs.acc, val_acc: logs.val_acc, completed: false };
-          if (chartInstance) {
-            chartInstance.data.labels.push(epoch + 1);
-            chartInstance.data.datasets[0].data.push(logs.loss);
-            chartInstance.data.datasets[1].data.push(logs.acc);
-            chartInstance.data.datasets[2].data.push(logs.val_acc);
+    // 1. 发送开始指令
+    const res = await fetch(`${API_BASE}/train`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ epochs: config.value.epochs })
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message);
+
+    ElMessage.success('服务器已开始训练...');
+
+    // 2. 开启轮询 (每秒查一次状态)
+    const pollInterval = setInterval(async () => {
+      try {
+        const statusRes = await fetch(`${API_BASE}/train/status`);
+        const status = await statusRes.json();
+
+        // 更新界面状态
+        if (status.phase === 'training' || status.phase === 'complete') {
+          trainStatus.value = {
+            epoch: status.epoch,
+            loss: status.loss || 0,
+            acc: status.acc || 0,
+            val_acc: status.val_acc
+          };
+
+          // 更新图表
+          if (chartInstance && status.epoch > chartInstance.data.labels.length) {
+            chartInstance.data.labels.push(status.epoch);
+            chartInstance.data.datasets[0].data.push(status.loss);
+            chartInstance.data.datasets[1].data.push(status.acc);
+            chartInstance.data.datasets[2].data.push(status.val_acc);
             chartInstance.update();
           }
-        },
-        onBatchProcess: (processed, total) => {
-          featureProcess.value = { processed, total, done: processed >= total };
         }
-      }
-    );
-    trainStatus.value.completed = true;
 
-    if (autoPublish) await publishModel();
-    else ElMessage.success('模型训练完成！');
+        // 检查是否结束
+        if (status.phase === 'complete') {
+          clearInterval(pollInterval);
+          isTraining.value = false;
+          trainStatus.value.completed = true;
+          ElMessage.success('远程训练完成！');
+          // 训练完后，可以顺便拉取一下最新模型到本地（方便前端推理，如果还需要前端推理的话）
+          // syncModel(); 
+        } else if (status.phase === 'error') {
+          throw new Error(status.error || '训练异常中止');
+        }
+
+      } catch (err) {
+        clearInterval(pollInterval);
+        isTraining.value = false;
+        ElMessage.error('获取训练状态失败: ' + err.message);
+      }
+    }, 1000); // 1秒轮询一次
 
   } catch (err) {
-    ElMessage.error('训练出错: ' + err.message);
-  } finally {
     isTraining.value = false;
+    ElMessage.error('启动训练失败: ' + err.message);
   }
 };
 
